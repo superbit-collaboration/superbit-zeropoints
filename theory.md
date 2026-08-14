@@ -28,9 +28,9 @@ filter has a transmission curve `S(λ)`: 0 = blocked, 1 = fully transmitted.
 average of the spectrum** over the filter's wavelength range
 (`synthetic_photometry.py`'s `mean_fnu()` / `mean_flambda()`):
 
-$$\langle f_\lambda \rangle = \frac{\int f_\lambda(\lambda)\, S(\lambda)\, \lambda\, d\lambda}{\int S(\lambda)\, \lambda\, d\lambda}
+$$\langle f_\lambda \rangle = \frac{\int f_\lambda(\lambda)\ S(\lambda)\ \lambda\ d\lambda}{\int S(\lambda)\ \lambda\ d\lambda}
 \qquad
-\langle f_\nu \rangle = \frac{\int f_\lambda(\lambda)\, S(\lambda)\, \lambda\, d\lambda}{\int S(\lambda)\, (c/\lambda)\, d\lambda}$$
+\langle f_\nu \rangle = \frac{\int f_\lambda(\lambda)\ S(\lambda)\ \lambda\ d\lambda}{\int S(\lambda)\ (c/\lambda)\ d\lambda}$$
 
 (The extra `λ` weights by photon count, not energy — real detectors count
 photons.)
@@ -41,15 +41,17 @@ Gaia's spectra are only reliable down to ~336 nm, but SuperBIT's u-band
 transmits starting around 300 nm (purple curve above, already nonzero
 before the gray "336 nm" line). For stars with a known temperature,
 surface gravity, and metallicity, we grab a matching theoretical
-(Castelli-Kurucz `ck04models`) atmosphere model, rescale it to match the
-*real* Gaia data in a 336-360 nm overlap window, and splice it onto the
-blue end — the dashed line above.
+(Castelli-Kurucz `ck04models`, [Castelli & Kurucz
+2004](https://arxiv.org/abs/astro-ph/0405087)) atmosphere model via
+[`stsynphot.catalog.grid_to_spec`](https://stsynphot.readthedocs.io/en/latest/api/stsynphot.catalog.grid_to_spec.html),
+rescale it to match the *real* Gaia data in a 336-360 nm overlap window,
+and splice it onto the blue end — the dashed line above.
 
 ## AB and Vega magnitudes
 
 Two conventions for "what does magnitude 0 mean":
 
-$$m_{AB} = -2.5\log_{10}\left(\frac{\langle f_\nu \rangle}{3631\,\text{Jy}}\right)
+$$m_{AB} = -2.5\log_{10}\left(\frac{\langle f_\nu \rangle}{3631\ \text{Jy}}\right)
 \qquad\qquad
 m_{\rm Vega} = -2.5\log_{10}\left(\frac{\langle f_\lambda \rangle_{\rm star}}{\langle f_\lambda \rangle_{\rm Vega}}\right)$$
 
@@ -91,9 +93,10 @@ SuperBIT's bandpasses swapped in should be trustworthy too.
 
 ## One zeropoint per band (`compute_sb_zeropoints.py`)
 
-Every star gives one estimate ($F_i$ being that star's `FLUX_AUTO`):
+Every star gives one estimate ($F_i$ is that star's `FLUX_AUTO`, $m_i$ its
+synthetic magnitude):
 
-$$\text{ZP}_i = m_{{\rm synth},i} + 2.5\log_{10}(F_i)$$
+$$\text{ZP}_i = m_i + 2.5\log_{10}(F_i)$$
 
 These ~4500 per-star estimates are combined with error-weighting and a
 leave-one-target-out jackknife into one zeropoint per band, with an error
@@ -103,6 +106,8 @@ bar:
 
 ## References
 
+- [`stsynphot.catalog.grid_to_spec`](https://stsynphot.readthedocs.io/en/latest/api/stsynphot.catalog.grid_to_spec.html) — pulls the ck04models spectrum for a given Teff/logg/[Fe/H]
+- [Castelli & Kurucz (2004)](https://arxiv.org/abs/astro-ph/0405087) — the ck04models atmosphere grid
 - [Gaia DR3 photometric calibration documentation](https://gea.esac.esa.int/archive/documentation/GDR3/Data_processing/chap_cu5pho/cu5pho_sec_photProc/cu5pho_ssec_photCal.html)
 - [AB magnitude — Wikipedia](https://en.wikipedia.org/wiki/AB_magnitude)
 - [THE Pan-STARRS1 PHOTOMETRIC SYSTEM](https://iopscience.iop.org/article/10.1088/0004-637X/750/2/99)
