@@ -15,7 +15,7 @@ Then get the large data this repo doesn't ship in git (SuperBIT star
 catalogs + Gaia XP spectra, ~200MB) into `external_data/`. This isn't
 reachable from every filesystem, so grab it from either:
 
-- shared analysis storage (hen): `/data/analysis/superbit_2023/sayan/zp_data/external_data`
+- hen: `/data/analysis/superbit_2023/sayan/zp_data/external_data`
 - [Google Drive](https://drive.google.com/drive/folders/1t-GOyoJ9phlzvC2cKMEfg3B_TpKp-xte)
 
 ## Running it

@@ -3,11 +3,12 @@ you already know synthetic photometry. See `README.md` for how to run it.
 
 ## The goal
 
-SuperBIT measures a star's brightness as a raw "instrumental flux"
-(`FLUX_AUTO`) with no absolute physical meaning by itself. A **magnitude
-zeropoint** converts that number into a real, calibrated magnitude:
+SuperBIT measures a star's brightness as a raw "instrumental flux",
+`FLUX_AUTO` (call it $F$), with no absolute physical meaning by itself. A
+**magnitude zeropoint** converts that number into a real, calibrated
+magnitude:
 
-$$m_{\rm true} = -2.5\log_{10}(\text{FLUX\_AUTO}) + \text{ZP}$$
+$$m_{\rm true} = -2.5\log_{10}(F) + \text{ZP}$$
 
 To find ZP we need stars whose true magnitude we already know
 independently. Gaia gives us that: for ~4500 stars, Gaia has published an
@@ -55,7 +56,7 @@ m_{\rm Vega} = -2.5\log_{10}\left(\frac{\langle f_\lambda \rangle_{\rm star}}{\l
 AB fixes magnitude 0 to a flat reference spectrum with flux density 3631 Jy
 at every frequency, where:
 
-$$1\,{\rm Jy} = 10^{-26}\,{\rm W\,m^{-2}\,Hz^{-1}}\ ({\rm SI}) = 10^{-23}\,{\rm erg\,s^{-1}\,cm^{-2}\,Hz^{-1}}\ ({\rm CGS})$$
+$$1{\rm Jy} = 10^{-26}{\rm W m^{-2} Hz^{-1}}\ ({\rm SI}) = 10^{-23} {\rm erg s^{-1} cm^{-2} Hz^{-1}}\ ({\rm CGS})$$
 
 **Why a flat spectrum:** it makes AB magnitude a property of the *filter*, not of some
 specific star's spectral quirks — a source with constant $f_\nu$ gets the
@@ -90,11 +91,13 @@ SuperBIT's bandpasses swapped in should be trustworthy too.
 
 ## One zeropoint per band (`compute_sb_zeropoints.py`)
 
-Every star gives one estimate: $\text{ZP}_i = m_{{\rm synth},i} + 2.5\log_{10}(\text{FLUX\_AUTO}_i)$.
+Every star gives one estimate ($F_i$ being that star's `FLUX_AUTO`):
+
+$$\text{ZP}_i = m_{{\rm synth},i} + 2.5\log_{10}(F_i)$$
+
 These ~4500 per-star estimates are combined with error-weighting and a
-leave-one-target-out jackknife (accounting for correlated systematics
-within a field, rather than treating every star as independent) into one
-zeropoint per band, with an honest error bar:
+leave-one-target-out jackknife into one zeropoint per band, with an error
+bar:
 
 ![Final zeropoint diagnostic](docs/figures/sb_zeropoints_diagnostic.png)
 
