@@ -1,0 +1,54 @@
+# Edit the paths in this file to match where you've put things locally.
+# All relative paths are resolved relative to this file's directory (i.e.
+# the repo root), so the defaults below work out of the box for everything
+# that ships in the repo. You only need to change `external_data_dir` (and
+# maybe `cdbs_dir`) after downloading the large files that don't ship in git.
+
+# --- Large data, downloaded separately ---
+# SuperBIT star catalogs + Gaia XP spectra (~200MB), too big for git. Get
+# this directory from either:
+#   - shared analysis storage: /data/analysis/superbit_2023/sayan/zp_data/external_data
+#   - Google Drive: https://drive.google.com/drive/folders/1t-GOyoJ9phlzvC2cKMEfg3B_TpKp-xte
+# and point external_data_dir at wherever you put it (default: a folder
+# named external_data/ next to this file).
+external_data_dir: "external_data"
+
+starcat_u: "${external_data_dir}/sb_starcats/all_targets_u_starcat_merged.fits"
+starcat_b: "${external_data_dir}/sb_starcats/all_targets_b_starcat_merged.fits"
+starcat_g: "${external_data_dir}/sb_starcats/all_targets_g_starcat_merged.fits"
+xp_spectra_ecsv: "${external_data_dir}/xp_continuous_all_targets.ecsv"
+
+# --- Small reference data that ships in the repo (data/) ---
+gaia_catalog: "data/gaia_dr3_merged.fits"
+bandpass_dir: "data/bandpass"
+gaia_passband_dir: "data/gaia_passbands"
+vega_spectrum_file: "data/vega/alpha_lyr_mod_002.fits"
+vega_rescaled_file: "data/vega/vega_rescaled_Wm2nm.npz"
+
+# Anchor flux used to rescale the Vega model spectrum (W/m^2/nm at 550nm).
+# Only used if you regenerate vega_rescaled_file; ships already-applied.
+vega_target_f550_Wm2nm: 3.62286e-11
+
+# --- Castelli-Kurucz (ck04models) stellar atmosphere grid ---
+# Downloaded from ssb.stsci.edu by scripts/download_ck04models.sh (~41MB).
+# Used to extend Gaia XP spectra below their ~336nm reliable floor.
+cdbs_dir: "${external_data_dir}/cdbs"
+
+# --- Pipeline parameters ---
+flux_col: "FLUX_AUTO"
+fluxerr_col: "FLUXERR_AUTO"
+match_tolerance_deg: 1.0e-4
+
+# Aggregation method for combining per-star zeropoints: "simple" (flat
+# sigma-clipped median, no error propagation) or "weighted" (inverse-
+# variance weighted mean using propagated errors, chi2-rescaled). Both are
+# always computed and printed; this picks which one the diagnostic plot
+# and jackknife report as primary.
+method: "weighted"
+
+# UV-extension range for splicing a ck04models spectrum onto the blue end
+# of the real (>=336nm) Gaia XP data.
+uv_extension_min_nm: 300
+uv_extension_overlap_nm: [336, 360]
+
+bands: ["u", "b", "g"]

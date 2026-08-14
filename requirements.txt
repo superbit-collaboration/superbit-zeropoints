@@ -1,0 +1,9 @@
+numpy>=2.0
+scipy>=1.16
+astropy>=7.0
+pandas>=2.2
+matplotlib>=3.10
+pyyaml>=6.0
+gaiaxpy>=2.1
+stsynphot>=1.5
+synphot>=1.7
