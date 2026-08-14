@@ -256,15 +256,15 @@ def compute_band_zeropoints(cfg, band, spectra_err_cache, vega_wave, vega_flux):
     return out
 
 
-def robust_stats(x):
+def robust_stats(x, sigma_clip_sigma=10.0):
     """Flat sigma-clipped median/std -- kept for comparison with the
     inverse-variance-weighted result."""
     x = x[np.isfinite(x)]
-    clipped = sigma_clip(x, sigma=4, maxiters=5)
+    clipped = sigma_clip(x, sigma=sigma_clip_sigma, maxiters=5)
     return np.ma.median(clipped), np.ma.std(clipped), clipped.count()
 
 
-def weighted_zeropoint(zp, sigma_zp, sigma_clip_thresh=4.0, max_iter=15):
+def weighted_zeropoint(zp, sigma_zp, sigma_clip_thresh=10.0, max_iter=15):
     """
     Inverse-variance-weighted mean zeropoint + formal uncertainty.
 
@@ -320,7 +320,7 @@ def weighted_zeropoint(zp, sigma_zp, sigma_clip_thresh=4.0, max_iter=15):
     return zp_weighted, sigma_zp_weighted, int(keep.sum()), reduced_chi2_final, inflation
 
 
-def aggregate_zeropoint(zp, sigma_zp, method):
+def aggregate_zeropoint(zp, sigma_zp, method, sigma_clip_sigma=10.0):
     """
     Dispatch to either aggregation method, with a common return signature
     so callers (jackknife, plotting, printing) don't need to care which one
@@ -333,16 +333,18 @@ def aggregate_zeropoint(zp, sigma_zp, method):
         {"reduced_chi2", "inflation"} for "weighted".
     """
     if method == "simple":
-        value, error, n_used = robust_stats(zp)
+        value, error, n_used = robust_stats(zp, sigma_clip_sigma=sigma_clip_sigma)
         return value, error, n_used, {}
     elif method == "weighted":
-        value, error, n_used, chi2, inflation = weighted_zeropoint(zp, sigma_zp)
+        value, error, n_used, chi2, inflation = weighted_zeropoint(
+            zp, sigma_zp, sigma_clip_thresh=sigma_clip_sigma
+        )
         return value, error, n_used, {"reduced_chi2": chi2, "inflation": inflation}
     else:
         raise ValueError(f"Unknown method: {method!r} (expected 'simple' or 'weighted')")
 
 
-def jackknife_zeropoint(zp, sigma_zp, target_labels, method):
+def jackknife_zeropoint(zp, sigma_zp, target_labels, method, sigma_clip_sigma=10.0):
     """
     Leave-one-target-out jackknife uncertainty on the aggregate zeropoint.
 
@@ -368,14 +370,16 @@ def jackknife_zeropoint(zp, sigma_zp, target_labels, method):
     mask = np.isfinite(zp) & np.isfinite(sigma_zp) & (sigma_zp > 0)
     zp, sigma_zp, targets = zp[mask], sigma_zp[mask], targets[mask]
 
-    theta_full, _, _, _ = aggregate_zeropoint(zp, sigma_zp, method=method)
+    theta_full, _, _, _ = aggregate_zeropoint(zp, sigma_zp, method=method, sigma_clip_sigma=sigma_clip_sigma)
 
     unique_targets = sorted(set(targets))
     n = len(unique_targets)
     loo = np.zeros(n)
     for i, t in enumerate(unique_targets):
         keep = targets != t
-        loo[i], _, _, _ = aggregate_zeropoint(zp[keep], sigma_zp[keep], method=method)
+        loo[i], _, _, _ = aggregate_zeropoint(
+            zp[keep], sigma_zp[keep], method=method, sigma_clip_sigma=sigma_clip_sigma
+        )
 
     theta_bar = np.mean(loo)
     jackknife_se = np.sqrt((n - 1) / n * np.sum((loo - theta_bar) ** 2))
@@ -399,16 +403,18 @@ def main():
         out.write(os.path.join(OUTPUT_DIR, f"sb_zeropoints_{band}_{cfg['flux_col']}.fits"), overwrite=True)
         results[band] = out
 
-        med_ab, std_ab, n_ab = robust_stats(np.asarray(out["zp_AB"]))
-        med_vega, std_vega, n_vega = robust_stats(np.asarray(out["zp_VEGA"]))
+        sigma_clip_sigma = cfg["sigma_clip_sigma"]
+
+        med_ab, std_ab, n_ab = robust_stats(np.asarray(out["zp_AB"]), sigma_clip_sigma=sigma_clip_sigma)
+        med_vega, std_vega, n_vega = robust_stats(np.asarray(out["zp_VEGA"]), sigma_clip_sigma=sigma_clip_sigma)
         print(f"[{band}] flat median   ZP_AB   = {med_ab:.4f} +/- {std_ab:.4f}  (N={n_ab})")
         print(f"[{band}] flat median   ZP_VEGA = {med_vega:.4f} +/- {std_vega:.4f}  (N={n_vega})")
 
         zp_ab_w, sig_ab_w, n_ab_w, chi2_ab, infl_ab = weighted_zeropoint(
-            np.asarray(out["zp_AB"]), np.asarray(out["sigma_zp_AB"])
+            np.asarray(out["zp_AB"]), np.asarray(out["sigma_zp_AB"]), sigma_clip_thresh=sigma_clip_sigma
         )
         zp_vega_w, sig_vega_w, n_vega_w, chi2_vega, infl_vega = weighted_zeropoint(
-            np.asarray(out["zp_VEGA"]), np.asarray(out["sigma_zp_VEGA"])
+            np.asarray(out["zp_VEGA"]), np.asarray(out["sigma_zp_VEGA"]), sigma_clip_thresh=sigma_clip_sigma
         )
         print(f"[{band}] weighted mean ZP_AB   = {zp_ab_w:.4f} +/- {sig_ab_w:.4f}  "
               f"(N={n_ab_w}, reduced chi2={chi2_ab:.2f}, error inflation={infl_ab:.1f}x)")
@@ -422,10 +428,12 @@ def main():
         print(f"[{band}]")
         for method in ("simple", "weighted"):
             theta_ab, jack_se_ab, n_targets, _ = jackknife_zeropoint(
-                np.asarray(out["zp_AB"]), np.asarray(out["sigma_zp_AB"]), target_labels, method=method
+                np.asarray(out["zp_AB"]), np.asarray(out["sigma_zp_AB"]), target_labels,
+                method=method, sigma_clip_sigma=cfg["sigma_clip_sigma"],
             )
             theta_vega, jack_se_vega, _, _ = jackknife_zeropoint(
-                np.asarray(out["zp_VEGA"]), np.asarray(out["sigma_zp_VEGA"]), target_labels, method=method
+                np.asarray(out["zp_VEGA"]), np.asarray(out["sigma_zp_VEGA"]), target_labels,
+                method=method, sigma_clip_sigma=cfg["sigma_clip_sigma"],
             )
             print(f"  {method:8s} ZP_AB   = {theta_ab:.4f} +/- {jack_se_ab:.4f}  (N_targets={n_targets})")
             print(f"  {method:8s} ZP_VEGA = {theta_vega:.4f} +/- {jack_se_vega:.4f}  (N_targets={n_targets})")
@@ -452,11 +460,17 @@ def make_diagnostic_plot(cfg, results):
         sigma_zp_vega = np.asarray(out["sigma_zp_VEGA"])
         target_labels = np.asarray(out["TARGET"])
 
-        zp_ab_w, _, n_ab_w, _ = aggregate_zeropoint(zp_ab, sigma_zp_ab, method=method)
-        zp_vega_w, _, n_vega_w, _ = aggregate_zeropoint(zp_vega, sigma_zp_vega, method=method)
+        sigma_clip_sigma = cfg["sigma_clip_sigma"]
 
-        theta_ab, jack_se_ab, _, _ = jackknife_zeropoint(zp_ab, sigma_zp_ab, target_labels, method=method)
-        theta_vega, jack_se_vega, _, _ = jackknife_zeropoint(zp_vega, sigma_zp_vega, target_labels, method=method)
+        zp_ab_w, _, n_ab_w, _ = aggregate_zeropoint(zp_ab, sigma_zp_ab, method=method, sigma_clip_sigma=sigma_clip_sigma)
+        zp_vega_w, _, n_vega_w, _ = aggregate_zeropoint(zp_vega, sigma_zp_vega, method=method, sigma_clip_sigma=sigma_clip_sigma)
+
+        theta_ab, jack_se_ab, _, _ = jackknife_zeropoint(
+            zp_ab, sigma_zp_ab, target_labels, method=method, sigma_clip_sigma=sigma_clip_sigma
+        )
+        theta_vega, jack_se_vega, _, _ = jackknife_zeropoint(
+            zp_vega, sigma_zp_vega, target_labels, method=method, sigma_clip_sigma=sigma_clip_sigma
+        )
 
         ax.scatter(inst_mag, zp_ab, s=6, alpha=0.35, color="tab:blue", label=f"AB (N={n_ab_w})")
         ax.scatter(inst_mag, zp_vega, s=6, alpha=0.35, color="tab:orange", label=f"Vega (N={n_vega_w})")
