@@ -1,12 +1,12 @@
 # SuperBIT zeropoints
 
 Computes SuperBIT's u, b, g magnitude zeropoints from Gaia DR3 XP spectra.
-**Read `theory.md` first** for how and why this works, in plain language.
+**Read `theory.md` first** for how and why this works.
 
 ## Setup
 
 ```bash
-git clone <this-repo> && cd <this-repo>
+git clone git@github.com:superbit-collaboration/superbit-zeropoints.git && cd superbit-zeropoints
 pip install -r requirements.txt
 bash scripts/download_ck04models.sh   # ~41MB stellar atmosphere grid
 ```
