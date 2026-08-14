@@ -72,8 +72,9 @@ backward compatibility. All spectra and flux quantities in this pipeline
 are kept in SI units (W, m, nm) throughout, consistently.
 
 The Vega reference spectrum used for $m_{\rm Vega}$ above (a CALSPEC model,
-Bohlin 2014) is shown below — note the absorption features referred to
-above, which are exactly what make the Vega-AB offset band-dependent:
+Bohlin 2014) is shown below, with SuperBIT's bandpasses overlaid — note the
+absorption features referred to above, which are exactly what make the
+Vega-AB offset band-dependent:
 
 ![Vega reference spectrum](docs/figures/vega_reference_spectrum.png)
 

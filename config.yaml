@@ -49,7 +49,7 @@ method: "weighted"
 # Sigma-clip threshold used by both aggregation methods: robust_stats()'s
 # flat clip, and weighted_zeropoint()'s clip in units of its self-
 # consistently inflated error (see that function's docstring).
-sigma_clip_sigma: 10.0
+sigma_clip_sigma: 5.0
 
 # UV-extension range for splicing a ck04models spectrum onto the blue end
 # of the real (>=336nm) Gaia XP data.

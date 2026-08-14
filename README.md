@@ -32,9 +32,9 @@ Writes per-star tables and diagnostic plots to `outputs/`. Edit
 
 | Band | ZP (AB) | ZP (Vega) |
 |------|---------|-----------|
-| u | 28.689 ± 0.005 | 28.602 ± 0.005 |
-| b | 30.227 ± 0.002 | 30.293 ± 0.002 |
-| g | 29.612 ± 0.002 | 29.534 ± 0.002 |
+| u | 28.687 ± 0.005 | 28.601 ± 0.005 |
+| b | 30.223 ± 0.004 | 30.288 ± 0.004 |
+| g | 29.610 ± 0.002 | 29.532 ± 0.002 |
 
 (jackknifed across 30 target fields; see `theory.md` for why that error
 bar, not a flat per-star one, is the one to trust)
