@@ -99,9 +99,11 @@ synthetic magnitude):
 
 $$\text{ZP}_i = m_i + 2.5\log_{10}(F_i)$$
 
-These ~4500 per-star estimates are combined with error-weighting and a
-leave-one-target-out jackknife into one zeropoint per band, with an error
-bar:
+Very bright stars (instrumental magnitude below `bright_mag_cut`, shaded gray
+below) are dropped first -- they visibly pull away from the flat trend,
+consistent with detector saturation. The remaining ~4000-4500 per-star
+estimates are combined with error-weighting and a leave-one-target-out
+jackknife into one zeropoint per band, with an error bar:
 
 ![Final zeropoint diagnostic](docs/figures/sb_zeropoints_diagnostic.png)
 

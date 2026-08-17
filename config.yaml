@@ -51,6 +51,14 @@ method: "weighted"
 # consistently inflated error (see that function's docstring).
 sigma_clip_sigma: 5.0
 
+# Stars brighter than this instrumental magnitude (-2.5log10(flux_col), so
+# "brighter" means more negative) are excluded from zeropoint aggregation
+# (robust_stats/weighted_zeropoint/jackknife) -- the diagnostic plot shows
+# these very bright stars pulling away from the flat trend, consistent with
+# detector saturation. They're still kept in the per-star output FITS table
+# and plotted (just not used in the fit). Set to null to disable the cut.
+bright_mag_cut: -15.0
+
 # UV-extension range for splicing a ck04models spectrum onto the blue end
 # of the real (>=336nm) Gaia XP data.
 uv_extension_min_nm: 300
