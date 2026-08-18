@@ -359,6 +359,106 @@ def aggregate_zeropoint(zp, sigma_zp, method, sigma_clip_sigma=10.0):
         raise ValueError(f"Unknown method: {method!r} (expected 'simple' or 'weighted')")
 
 
+def per_target_zeropoints(zp, sigma_zp, target_labels, method, sigma_clip_sigma=10.0):
+    """
+    Aggregate the zeropoint separately per target, using only that target's
+    own stars -- to directly visualize the target-to-target scatter that
+    the leave-one-out jackknife error bar is summarizing into one number.
+
+    `errors` is always the standard error of that target's own central
+    value (not a population scatter): for "weighted", aggregate_zeropoint()
+    already returns a proper inverse-variance SE; for "simple", it returns
+    the flat sigma-clipped *std* (by design -- see robust_stats()'s
+    docstring, and how it's printed elsewhere as the raw per-star scatter),
+    which is rescaled to a standard error here (std/sqrt(n)) so this
+    function's `errors` means the same thing regardless of method.
+
+    Returns
+    -------
+    targets, values, errors, n_used
+        Each length-N_targets, in the same (sorted) target order used by
+        jackknife_zeropoint().
+    """
+    targets = np.asarray([t.decode() if isinstance(t, bytes) else t for t in target_labels])
+    mask = np.isfinite(zp) & np.isfinite(sigma_zp) & (sigma_zp > 0)
+    zp, sigma_zp, targets = zp[mask], sigma_zp[mask], targets[mask]
+
+    unique_targets = sorted(set(targets))
+    values = np.full(len(unique_targets), np.nan)
+    errors = np.full(len(unique_targets), np.nan)
+    n_used = np.zeros(len(unique_targets), dtype=int)
+    for i, t in enumerate(unique_targets):
+        sel = targets == t
+        values[i], errors[i], n_used[i], _ = aggregate_zeropoint(
+            zp[sel], sigma_zp[sel], method=method, sigma_clip_sigma=sigma_clip_sigma
+        )
+        if method == "simple" and n_used[i] > 0:
+            errors[i] /= np.sqrt(n_used[i])
+    return unique_targets, values, errors, n_used
+
+
+def between_target_variance_decomposition(zp, sigma_zp, target_labels, method, sigma_clip_sigma=10.0):
+    """
+    Standard-error-of-the-mean across each target's own aggregate ZP,
+    treating all N_targets values as equally informative regardless of how
+    many stars each target contributed -- and decomposed into how much of
+    that scatter is genuine target-to-target difference vs. just each
+    target's own finite-N estimation noise.
+
+    This is a deliberately cruder alternative to jackknife_zeropoint(): the
+    delete-1 jackknife on a *weighted* mean only moves by roughly a target's
+    share of the total statistical weight when that target is dropped, so a
+    small-N target with a real, large per-target offset barely pulls the
+    jackknife estimate even though it's genuinely discrepant (confirmed by
+    inspection: e.g. two ~25-40 star targets ~0.03 mag off in b/g move the
+    pooled weighted mean by <0.0005 mag when removed). Treating every
+    target's own mean as one equal-weight draw sidesteps that leverage
+    effect entirely, at the cost of not knowing how reliable each target's
+    own mean is.
+
+    But the raw scatter of those N_targets values conflates two things:
+    real target-to-target differences (tau, e.g. residual extinction,
+    crowding, calibration quirks specific to a field) and each target's own
+    sampling noise (large for a target with only ~20 matched stars). This
+    uses the standard random-effects / method-of-moments split: if each
+    observed per-target mean theta_i = mu + b_i + eps_i with b_i ~ (0, tau^2)
+    the real between-target effect and eps_i ~ (0, sigma_i^2) its own
+    (already-computed) formal error, then
+
+        Var(theta_i) = tau^2 + mean(sigma_i^2)
+
+    so tau^2 = max(0, sample_var(theta_i) - mean(sigma_i^2)). The two terms
+    add in quadrature to reproduce the plain (total) SE, so this is purely
+    a breakdown of the same number, not a different estimate of it.
+
+    Returns
+    -------
+    dict: n_targets, total_se (== the undecomposed naive SE), within_se
+    (component from each target's own noise), between_se (component from
+    genuine target-to-target scatter), tau (sqrt of the between-target
+    variance itself, in magnitudes -- "real" scatter with counting noise
+    removed)
+    """
+    _, values, errors, _ = per_target_zeropoints(
+        zp, sigma_zp, target_labels, method=method, sigma_clip_sigma=sigma_clip_sigma
+    )
+    finite = np.isfinite(values) & np.isfinite(errors)
+    values, errors = values[finite], errors[finite]
+    n = len(values)
+
+    sample_var = np.var(values, ddof=1)
+    mean_within_var = np.mean(errors ** 2)
+    tau2 = max(0.0, sample_var - mean_within_var)
+
+    return {
+        "n_targets": n,
+        "total_se": np.sqrt(sample_var / n),
+        "within_se": np.sqrt(mean_within_var / n),
+        "between_se": np.sqrt(tau2 / n),
+        "tau": np.sqrt(tau2),
+    }
+
+
 def jackknife_zeropoint(zp, sigma_zp, target_labels, method, sigma_clip_sigma=10.0):
     """
     Leave-one-target-out jackknife uncertainty on the aggregate zeropoint.
@@ -455,10 +555,85 @@ def main():
                 np.asarray(out["zp_VEGA"])[use], np.asarray(out["sigma_zp_VEGA"])[use], target_labels,
                 method=method, sigma_clip_sigma=cfg["sigma_clip_sigma"],
             )
-            print(f"  {method:8s} ZP_AB   = {theta_ab:.4f} +/- {jack_se_ab:.4f}  (N_targets={n_targets})")
-            print(f"  {method:8s} ZP_VEGA = {theta_vega:.4f} +/- {jack_se_vega:.4f}  (N_targets={n_targets})")
+            print(f"  {method:8s} ZP_AB   = {theta_ab:.4f} +/- {jack_se_ab:.4f}  (N_targets={n_targets}, jackknife SE)")
+            print(f"  {method:8s} ZP_VEGA = {theta_vega:.4f} +/- {jack_se_vega:.4f}  (N_targets={n_targets}, jackknife SE)")
+
+            # decomp_ab = between_target_variance_decomposition(
+            #     np.asarray(out["zp_AB"])[use], np.asarray(out["sigma_zp_AB"])[use], target_labels,
+            #     method=method, sigma_clip_sigma=cfg["sigma_clip_sigma"],
+            # )
+            # decomp_vega = between_target_variance_decomposition(
+            #     np.asarray(out["zp_VEGA"])[use], np.asarray(out["sigma_zp_VEGA"])[use], target_labels,
+            #     method=method, sigma_clip_sigma=cfg["sigma_clip_sigma"],
+            # )
+            # print(f"  {method:8s} ZP_AB   = {theta_ab:.4f} +/- {decomp_ab['total_se']:.4f}  "
+            #       f"(N_targets={n_targets}, naive unweighted between-target SE; "
+            #       f"within={decomp_ab['within_se']:.4f}, between={decomp_ab['between_se']:.4f}, tau={decomp_ab['tau']:.4f})")
+            # print(f"  {method:8s} ZP_VEGA = {theta_vega:.4f} +/- {decomp_vega['total_se']:.4f}  "
+            #       f"(N_targets={n_targets}, naive unweighted between-target SE; "
+            #       f"within={decomp_vega['within_se']:.4f}, between={decomp_vega['between_se']:.4f}, tau={decomp_vega['tau']:.4f})")
 
     make_diagnostic_plot(cfg, results)
+    make_per_target_plot(cfg, results)
+
+
+def make_per_target_plot(cfg, results):
+    """
+    Per-band panel of each target's own aggregate ZP (+ error bar) vs.
+    target name, to visualize the target-to-target scatter behind the
+    jackknife error bar -- e.g. whether it's a few outlier targets or
+    broad, uniform scatter across all of them.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    matplotlib.rcParams["text.usetex"] = False  # gaiaxpy forces this True on import
+
+    method = cfg["method"]
+    bands = cfg["bands"]
+    sigma_clip_sigma = cfg["sigma_clip_sigma"]
+
+    fig, axes = plt.subplots(len(bands), 1, figsize=(14, 4.5 * len(bands)))
+    if len(bands) == 1:
+        axes = [axes]
+
+    for ax, band in zip(axes, bands):
+        out = results[band]
+        use = saturation_mask(out["inst_mag"], cfg.get("bright_mag_cut"))
+        target_labels = np.asarray(out["TARGET"])[use]
+        zp_ab = np.asarray(out["zp_AB"])[use]
+        sigma_zp_ab = np.asarray(out["sigma_zp_AB"])[use]
+        zp_vega = np.asarray(out["zp_VEGA"])[use]
+        sigma_zp_vega = np.asarray(out["sigma_zp_VEGA"])[use]
+
+        targets, val_ab, err_ab, n_ab = per_target_zeropoints(
+            zp_ab, sigma_zp_ab, target_labels, method=method, sigma_clip_sigma=sigma_clip_sigma
+        )
+        _, val_vega, err_vega, n_vega = per_target_zeropoints(
+            zp_vega, sigma_zp_vega, target_labels, method=method, sigma_clip_sigma=sigma_clip_sigma
+        )
+
+        overall_ab, _, _, _ = aggregate_zeropoint(zp_ab, sigma_zp_ab, method=method, sigma_clip_sigma=sigma_clip_sigma)
+        overall_vega, _, _, _ = aggregate_zeropoint(zp_vega, sigma_zp_vega, method=method, sigma_clip_sigma=sigma_clip_sigma)
+
+        x = np.arange(len(targets))
+        ax.errorbar(x - 0.12, val_ab, yerr=err_ab, fmt="o", ms=4, capsize=2,
+                    color="tab:blue", label="AB (per-target)")
+        ax.errorbar(x + 0.12, val_vega, yerr=err_vega, fmt="o", ms=4, capsize=2,
+                    color="tab:orange", label="Vega (per-target)")
+        ax.axhline(overall_ab, color="tab:blue", lw=1.2, ls="--", alpha=0.7, label="AB (overall)")
+        ax.axhline(overall_vega, color="tab:orange", lw=1.2, ls="--", alpha=0.7, label="Vega (overall)")
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(targets, rotation=90, fontsize=7)
+        ax.set_ylabel("Per-target ZP")
+        ax.set_title(f"{band}-band", fontsize=11)
+        ax.legend(fontsize=8, loc="best", ncol=2)
+
+    plt.tight_layout()
+    outname = os.path.join(OUTPUT_DIR, f"sb_zeropoints_per_target_{cfg['flux_col']}.png")
+    plt.savefig(outname, dpi=150)
+    print(f"Wrote {outname}")
 
 
 def make_diagnostic_plot(cfg, results):
