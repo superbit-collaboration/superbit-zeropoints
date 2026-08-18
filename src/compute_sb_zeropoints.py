@@ -644,6 +644,25 @@ def make_diagnostic_plot(cfg, results):
 
     method = cfg["method"]
     bands = cfg["bands"]
+    ylim_pct = 1.0  # clip the y-axis to the [pct, 100-pct] range of per-star zeropoints
+
+    # First pass: per-band (center, half-width) from a percentile clip of the
+    # per-star scatter (excludes outliers), before deciding on axis limits --
+    # bands can have very different central values, but sharing one common
+    # y-window *height* across all panels (each centered on its own data)
+    # makes their scatter directly, visually comparable, rather than each
+    # panel's own autoscaling hiding how much noisier one band is than
+    # another.
+    band_range = {}
+    for band in bands:
+        out = results[band]
+        use = saturation_mask(out["inst_mag"], cfg.get("bright_mag_cut"))
+        zp_ab = np.asarray(out["zp_AB"])[use]
+        zp_vega = np.asarray(out["zp_VEGA"])[use]
+        combo = np.concatenate([zp_ab[np.isfinite(zp_ab)], zp_vega[np.isfinite(zp_vega)]])
+        lo, hi = np.percentile(combo, [ylim_pct, 100 - ylim_pct])
+        band_range[band] = ((lo + hi) / 2, (hi - lo) / 2)
+    common_half_width = max(half_width for _, half_width in band_range.values())
 
     fig, axes = plt.subplots(1, len(bands), figsize=(16, 5), sharey=False)
     for ax, band in zip(axes, bands):
@@ -681,7 +700,13 @@ def make_diagnostic_plot(cfg, results):
             xlim = ax.get_xlim()
             ax.axvspan(xlim[0], bright_cut, color="gray", alpha=0.12, zorder=0,
                        label="excluded (saturated)")
-            ax.set_xlim(xlim)
+            if band == "u":
+                ax.set_xlim(xlim[0], -6)
+            else:
+                ax.set_xlim(xlim)
+
+        center = np.mean([theta_ab, theta_vega])
+        ax.set_ylim(center - common_half_width, center + common_half_width)
 
         ax.set_xlabel(f"Instrumental mag (-2.5log10({cfg['flux_col']}))")
         ax.set_ylabel("Per-star zeropoint")
