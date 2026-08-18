@@ -71,12 +71,26 @@ AB roughly matches the old Vega-based V-band magnitude scale, for
 backward compatibility. All spectra and flux quantities in this pipeline
 are kept in SI units (W, m, nm) throughout, consistently.
 
+`scripts/derive_ab_zeropoint.py` checks that "backward compatibility"
+claim directly: integrating a real Vega spectrum through a real Johnson V
+bandpass reproduces 3631 Jy to within 0.01%, with no free parameters.
+
 The Vega reference spectrum used for $m_{\rm Vega}$ above (a CALSPEC model,
 Bohlin 2014) is shown below, with SuperBIT's bandpasses overlaid — note the
 absorption features referred to above, which are exactly what make the
 Vega-AB offset band-dependent:
 
 ![Vega reference spectrum](docs/figures/vega_reference_spectrum.png)
+
+Since 3631 Jy was picked to match Vega's flux in the optical, the AB-Vega
+offset stays small there (a few hundredths of a mag, consistent with the
+u/g vs. b sign flip above) -- but it grows the further a band sits from the
+optical, since AB's flat reference and Vega's real (declining) spectrum
+diverge more. For example, Roman's reddest bands (shown below purely as an
+illustrative external example, alongside SuperBIT's and Johnson V's) see
+the offset grow to 1.3-1.8 mag:
+
+![AB-Vega offset by band](docs/figures/ab_vega_offset_by_band.png)
 
 ## Sanity check: does this reproduce Gaia's own magnitudes?
 
