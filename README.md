@@ -3,6 +3,22 @@
 Computes SuperBIT's u, b, g magnitude zeropoints from Gaia DR3 XP spectra.
 **Read `theory.md` first** for how and why this works.
 
+## Contributors
+
+Most of the utilities for estimating synthetic Vega magnitudes from Gaia
+spectra were developed by **Thuy Vy Luu (Princeton)**, including the
+self-calibration against the Gaia photometric catalog.
+
+The AB magnitude zero points were estimated independently by
+**Emaad Paracha (UToronto)** and **Ajay Gill (UToronto)**, the latter as
+part of his thesis (see [Section 3.8](https://utoronto.scholaris.ca/items/9b6ae5fe-04cd-44bf-be63-67e6ea6dd68f)). The AB synthetic
+magnitude utilities in this repo are imported from his photometry code
+([link](https://github.com/superbit-collaboration/superbit_photometry/blob/master/photometry.py)). Both Emaad's and Ajay's zero points are
+consistent with the final version implemented here.
+
+This repository was created to assemble everyone's work into a single,
+refactored pipeline for future reproducibility.
+
 ## Setup
 
 ```bash
@@ -40,3 +56,4 @@ Writes per-star tables and diagnostic plots to `outputs/`. Edit
 bar, not a flat per-star one, is the one to trust)
 
 ![Final zeropoint diagnostic](docs/figures/sb_zeropoints_diagnostic.png)
+
